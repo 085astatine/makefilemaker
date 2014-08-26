@@ -38,7 +38,6 @@ class MakefileGenerator:
         makefile = self._dir_path.joinpath('Makefile')
         with makefile.open(mode= 'w', encoding= 'utf-8', newline= '') as file:
             file.write('\n'.join(self.make_code()))
-            file.write('\n')
     
     def make_code(self):
         """Makefileのコードを生成"""
@@ -115,6 +114,7 @@ class MakefileGenerator:
                     [dummy_target]))
             code.append('\t$(MAKE) all -C $@')
             code.extend(target_format(dummy_target))
+        code.append('')# 空行
         return code
     
     def target_clean(self):
@@ -136,6 +136,7 @@ class MakefileGenerator:
                                  .format(MakefileMacroName.subdirs),
                          '\t    $(MAKE) clean -C $$subdir; \\',
                          '\tdone'])
+        code.append('')# 空行
         return code
     
     def compile_rule(self):
@@ -155,6 +156,7 @@ class MakefileGenerator:
             code.extend(link_rule(build_data,
                                   self._build_comamnd_maker,
                                   self._dir_path))
+            code.append('')
         return code
     
     def dependent_header(self):
@@ -162,6 +164,7 @@ class MakefileGenerator:
         code = []
         for build_data in self._build_data_list:
             code.extend(dependent_header(build_data, self._dir_path))
+            code.append('')
         return code
     
     def __repr__(self):
