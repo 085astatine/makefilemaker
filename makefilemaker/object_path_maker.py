@@ -1,5 +1,23 @@
 # -*- coding: utf-8 -*-
 
+def object_path_maker(self, source_path):
+    """オブジェクトファイルのパスを生成
+    self       : MakefileMaker
+    root_path  : 基準となるディレクトリのpath
+    source_path: ソースコードのpath"""
+    object_dir  = self._object_dir_maker(self._root_path, source_path)
+    object_name = self._object_name_maker(source_path)
+    return object_dir.joinpath(object_name)
+
+def make_object_path_converter(self, source_code_list):
+    """sourceのpath -> objectのpath の変換
+    self            : MakefileMaker
+    source_code_list: sourceのpathのlist
+    return {source_path: object_path, ...}"""
+    converter = dict((source_path, object_path_maker(self, source_path))
+                     for source_path in source_code_list)
+    return converter
+
 """
 object_name_maker
   source_pathからオブジェクトファイル名を生成する関数

@@ -1,58 +1,71 @@
 # -*- coding: utf-8 -*-
 
-import sys, pathlib
+import sys
+import pathlib
 
-from .code_manager      import CodeManager
-from .code_block \
-import CodeBlock, MainCodeBlock, MakeBlock, RootMakeBlock
-from .compiler_setting  import CompilerSetting
+from .code_manager        import CodeManager
+from .compiler_setting    import CompilerSetting
+from .build_command_maker import BuildCommandMaker
 from .object_path_maker \
 import same_source_name, same_source_dir, specific_directory
-from .link_object_searcher import replace_suffix
-from .command_line_option \
-import basic_option, parse_option
+from .link_object import LinkObject, LinkObjectMode
+from .command_line_option import option_parser, parse_option
+from .main_functions \
+import make_build_data_list, make_makefile_generator
+from .path_function import path_to_string, path_sort
 
 class MakefileMaker:
     def __init__(self):
         # オプション取得
-        option_parser = basic_option()
-        self._option = parse_option(option_parser)
-        print(self._option)
+        self._option = parse_option(option_parser())
+        if(self._option.verbose >= 1):
+            print('option list:')
+            print('  ', self._option)
+        # root directory
+        self._root_path = pathlib.Path(sys.argv[0]).parent.resolve()
         # コード管理
-        self._code_manager = CodeManager()
+        self._code_manager = CodeManager(self._option)
         # オブジェクトファイルのパスを生成する関数
         #   入力 root_path, source_path
         self._object_dir_maker  = same_source_dir()
         #   入力 source_path
         self._object_name_maker = same_source_name('o')
-        # 依存しているヘッダファイルリストから
-        # リンク対象のオブジェクトを取得する関数
-        #   入力 include_files
-        self._link_source_seacher = replace_suffix(('c','cpp',))
         # コンパイラ設定
         self._compiler_setting = CompilerSetting()
-        # mainコードと対応する実行プログラム名
-        self._main_code = {}
+        self._build_command_maker = BuildCommandMaker(
+                    self._compiler_setting,
+                    self._option.verbose >= 1)
+        # LinkObjectのlog file
+        self._link_object_log = None
     
     def run(self):
-        root_path = pathlib.Path(sys.argv[0]).parent.resolve()
-        # ディレクトリ構造を取得
-        structure = self._code_manager.structure()
-        # 各コードの情報
-        code_block_list = make_code_block_list(self, root_path)
+        # 各コードのビルド情報をまとめる
+        build_data_list = make_build_data_list(self)
+        #   リンクするオブジェクトを解析
+        link_object_searcher = LinkObject(
+                build_data_list,
+                self._code_manager,
+                self._build_command_maker,
+                self._option.verbose >= 1)
+        if not self._link_object_log is None:# log file 設定
+            link_object_searcher.set_log_file(self._link_object_log)
+        # LikObjectMode毎に処理
+        if self._option.mode is LinkObjectMode.All:
+            link_object_searcher.all()
+        elif self._option.mode is LinkObjectMode.Search:
+            link_object_searcher.search()
+        elif self._option.mode is LinkObjectMode.Analyze:
+            link_object_searcher.analyze()
+        elif self._option.mode is LinkObjectMode.FullAnalyze:
+            link_object_searcher.full_analyze()
+        build_data_list = link_object_searcher.build_data_list()
         #show_code_block_list(code_block_list)
-        # 各ディレクトリ毎にコード情報を分類
-        #   root以外
-        make_block_list = make_make_block_list(
-                self, root_path, structure, code_block_list)
-        #   root
-        root_make_block = make_root_make_block(
-            self, root_path, structure, code_block_list)
-        #print(make_block_list)
-        for make_block in make_block_list.values():
-            #print(make_block._dir_path)
-            make_block.make()
-        root_make_block.make()
+        # MakefileGeneratorを生成
+        makefile_generators = make_makefile_generator(self, build_data_list)
+        if self._option.test:# テストモードならばファイルを生成せず終了
+            return
+        for makefile_generator in makefile_generators:
+            makefile_generator.make()
     
     def source_code(self, source_path):
         """ソースコードを追加"""
@@ -63,11 +76,9 @@ class MakefileMaker:
         for source_path in source_path_list:
             self.source_code(source_path)
     
-    def main_code(self, program_name, main_source_name):
+    def main_code(self, program_name, main_code_path):
         # 実行プログラム名と対応するmainコードを追加
-        main_source_path = pathlib.Path(main_source_name).resolve()
-        self._main_code[main_source_path] = program_name
-        self._code_manager.add_source(main_source_name)
+        self._code_manager.add_main_code(main_code_path, program_name)
     
     def object_dir(self, dirname, relative= False):
         """オブジェクトファイルを置くディレクトリを設定
@@ -86,6 +97,8 @@ class MakefileMaker:
     def compiler(self, compiler):
         """コンパイラを指定"""
         self._compiler_setting.compiler = compiler
+        # 変更を反映
+        self._build_command_maker.update_compiler(self._compiler_setting)
     
     def compile_option(self, options):
         """コンパイルのオプションを指定"""
@@ -95,80 +108,32 @@ class MakefileMaker:
             self._compiler_setting.option_list.extend(options)
         else:# その他
             self._compiler_setting.option_list.append(options)
+        # 変更を反映
+        self._build_command_maker.update_compiler(self._compiler_setting)
     
-    def include_path(self, lib, include_path):
-        self._compiler_setting.include_setting[lib] = include_path
+    def include_path(self, target_lib, include_path):
+        """include設定を読み込む
+        target_lib  : 対象となるライブラリ名
+                          シーケンス or str
+        include_path: includeされるpath
+                          str or pathlib.Path"""
+        self._build_command_maker.add_include_setting(target_lib, include_path)
     
-    def library(self, lib_name, *lib_list):
-        self._compiler_setting.library_setting[lib_name] = tuple(lib_list)
-
-# 関数
-def object_path_maker(self, root_path, source_path):
-    """オブジェクトファイルのパスを生成"""
-    object_dir  = self._object_dir_maker(root_path, source_path)
-    object_name = self._object_name_maker(source_path)
-    return object_dir.joinpath(object_name)
-
-def make_code_block_list(self, root_path):
-    """各ソースコードのビルド情報をまとめる"""
-    result = {}
-    # 各ソースコードの依存性関係結果
-    dependence_data = self._code_manager.dependence_list()
-    # ソースコード毎に処理
-    for source_path in self._code_manager.source_code:
-        # オブジェクトファイルのパスを生成
-        object_path = object_path_maker(self, root_path, source_path)
-        # 追加
-        result[source_path] = CodeBlock(
-            source_path, object_path,
-            dependence_data[source_path].include_files,
-            dependence_data[source_path].include_libs)
-    # mainコードの処理
-    for source_path in self._main_code.keys():
-        result[source_path] = MainCodeBlock(
-                source_path, result[source_path].object_path,
-                self._main_code[source_path],
-                result[source_path].include_files,
-                result[source_path].include_libs,
-                link_objects(self, result[source_path].include_files, result))
-    return result
-
-def link_objects(self, include_files, code_block_list):
-    """プログラム作成時にリンク対象となるオブジェクトのパスを取得"""
-    objects_path = []
-    target_source_code = self._link_source_seacher(include_files)
-    for source_path in target_source_code:
-        objects_path.append(code_block_list[source_path].object_path)
-    return tuple(objects_path)
-
-def show_code_block_list(code_block_list):
-    """CodeBlockの一覧を表示"""
-    for key in sorted(code_block_list.keys(), key= lambda path : path.parent):
-        print(code_block_list[key])
-        print()
-
-def make_make_block_list(self, root_path, structure, code_block_list):
-    """各ディレクトリ毎にCodeBlockを分類"""
-    result = {}
-    for dir_path, source_path_list in structure.items():
-        # rootディレクトリは別の処理で実行
-        if dir_path == root_path: continue
-        result[dir_path] = MakeBlock(
-                dir_path,
-                tuple(code_block_list[source_path]
-                      for source_path in source_path_list),
-                self._compiler_setting)
-    return result
-
-def make_root_make_block(self, root_path, structure, code_block_list):
-    """rootディレクトリのCodeBlockを分類"""
-    subdirs = sorted(set(source_path.parent
-            for source_path in code_block_list.keys()
-            if source_path != root_path))
-    make_block = RootMakeBlock(
-        root_path,
-        tuple(code_block_list[source_path]
-                  for source_path in structure[root_path]),
-        self._compiler_setting,
-        subdirs)
-    return make_block
+    def library(self, library, target_lib):
+        """library設定を読み込む
+        target_lib : 対象となるライブラリ名
+                        シーケンス or str or None
+                        None ならば全てに適用
+        library    : ライブラリ名
+                        シーケンス or str"""
+        self._build_command_maker.add_library_setting(library, target_lib)
+    
+    def save_dependence_graph(self, filename):
+        file_path = self._root_path.joinpath(filename)
+        self._code_manager.save_dependent_graph(file_path)
+    
+    def set_link_object_log(self, log_file):
+        """LinkObjectのlog fileを設定
+        log_file: log file名 (str or pahlib.Path)"""
+        log_path = pathlib.Path(log_file)
+        self._link_object_log = log_path

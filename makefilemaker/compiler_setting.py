@@ -33,11 +33,6 @@ class CompilerSetting:
         self.compiler    = 'g++'
         self.option      = GCCCompilerOption
         self.option_list = []
-        # ライブラリ設定
-        self.include_setting      = {}
-        #   key: ライブラリ名, value: (ライブラリ)
-        self.library_setting      = OrderedDict()
-        self.library_path_setting = {}
     
     def define_standard_option(self,
             notlink, output, include_path, library, library_path):
