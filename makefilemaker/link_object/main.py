@@ -124,7 +124,6 @@ def analyze_step(self, main_code, source_code_list= None):
     # ソースコード設定
     if source_code_list is None:
         source_code_list = get_source_code_list(main_code, self._code_manager)
-    # ディレクトリで選別
     if self._verbose:# 解析対象を表示
         print('LinkObject Analyze: {0}'.format(path_to_string(main_code)))
     # SourceCodeTreeを作成

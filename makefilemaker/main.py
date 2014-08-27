@@ -11,7 +11,7 @@ import same_source_name, same_source_dir, specific_directory
 from .link_object import LinkObject, LinkObjectMode
 from .command_line_option import option_parser, parse_option
 from .main_functions \
-import make_build_data_list, make_makefile_generator
+import load_option, make_build_data_list, make_makefile_generator
 from .path_function import path_to_string, path_sort
 
 class MakefileMaker:
@@ -35,10 +35,14 @@ class MakefileMaker:
         self._build_command_maker = BuildCommandMaker(
                     self._compiler_setting,
                     self._option.verbose >= 1)
+        # LinkObjectMode
+        self._link_object_mode = LinkObjectMode.Search
         # LinkObjectのlog file
         self._link_object_log = None
     
     def run(self):
+        # option読み込み
+        load_option(self)
         # 各コードのビルド情報をまとめる
         build_data_list = make_build_data_list(self)
         #   リンクするオブジェクトを解析
@@ -50,16 +54,15 @@ class MakefileMaker:
         if not self._link_object_log is None:# log file 設定
             link_object_searcher.set_log_file(self._link_object_log)
         # LikObjectMode毎に処理
-        if self._option.mode is LinkObjectMode.All:
+        if self._link_object_mode is LinkObjectMode.All:
             link_object_searcher.all()
-        elif self._option.mode is LinkObjectMode.Search:
+        elif self._link_object_mode is LinkObjectMode.Search:
             link_object_searcher.search()
-        elif self._option.mode is LinkObjectMode.Analyze:
+        elif self._link_object_mode is LinkObjectMode.Analyze:
             link_object_searcher.analyze()
-        elif self._option.mode is LinkObjectMode.FullAnalyze:
+        elif self._link_object_mode is LinkObjectMode.FullAnalyze:
             link_object_searcher.full_analyze()
         build_data_list = link_object_searcher.build_data_list()
-        #show_code_block_list(code_block_list)
         # MakefileGeneratorを生成
         makefile_generators = make_makefile_generator(self, build_data_list)
         if self._option.test:# テストモードならばファイルを生成せず終了
@@ -131,6 +134,17 @@ class MakefileMaker:
     def save_dependence_graph(self, filename):
         file_path = self._root_path.joinpath(filename)
         self._code_manager.save_dependent_graph(file_path)
+    
+    def link_object_mode(self, mode_name):
+        """LinkObjectModeを設定
+        mode_name= search, all, analyze, full-analyze"""
+        for mode in LinkObjectMode:
+            if mode.value == mode_name:
+                self._link_object_mode = mode
+                break
+        else:
+            message= 'mode_name<{0}> is not LinkObjectMode'
+            raise ValueError(message);
     
     def set_link_object_log(self, log_file):
         """LinkObjectのlog fileを設定

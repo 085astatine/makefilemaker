@@ -1,9 +1,18 @@
 # -*- coding: utf-8 -*-
 
-from .build_data    import BuildData, ProgramBuildData
-from .makefile_generator   import MakefileGenerator
-from .path_function        import path_sort
-from .object_path_maker    import object_path_maker
+from .build_data         import BuildData, ProgramBuildData
+from .makefile_generator import MakefileGenerator
+from .object_path_maker  import object_path_maker
+from .path_function      import path_sort
+
+def load_option(self):
+    """コマンドラインオプションを読み込む"""
+    # LinkObjectMode
+    if not self._option.link_object_mode is None:
+        self._link_object_mode = self._option.link_object_mode
+    # logfile
+    if not self._option.log_file is None:
+        self.set_link_object_log(self._option.log_file)
 
 def make_build_data_list(self):
     """各ソースコードのビルド情報をまとめる

@@ -36,10 +36,18 @@ def basic_option():
 def link_object_option(parser):
     # LinkObjectMode
     parser.add_argument('--mode', 
+                        dest= 'link_object_mode',
                         action= LinkObjectModeSelect,
-                        default= LinkObjectMode.Search,
+                        default= None,
                         choices= [mode.value for mode in LinkObjectMode],
                         help= 'select link object mode')
+    # 解析ログ
+    parser.add_argument('--log',
+                        dest= 'log_file',
+                        action= 'store',
+                        default= None,
+                        metavar= 'LOGFILE',
+                        help= 'set the file to take the log')
 
 class LinkObjectModeSelect(argparse.Action):
     def __call__(self, parser, namespace, value, option_string= None):
@@ -49,8 +57,8 @@ class LinkObjectModeSelect(argparse.Action):
         option_string: このアクションを実行したオプション文字列"""
         for mode in LinkObjectMode:
             if mode.value == value:
-                 setattr(namespace, self.dest, mode)
-                 break
+                setattr(namespace, self.dest, mode)
+                break
         else:
             default_mode = LinkObjectMode.Search,
             setattr(namespace, self.dest, default_mode)

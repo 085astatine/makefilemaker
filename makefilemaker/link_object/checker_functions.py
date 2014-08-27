@@ -2,6 +2,7 @@
 
 import pathlib
 import subprocess
+import shlex
 from .functions import object_to_include_libs
 from ..build_data import ProgramBuildData
 
@@ -12,14 +13,16 @@ def build_test(build_data, build_command_maker, log_file= subprocess.DEVNULL):
                        1 -> 異常終了"""
     command = build_command_maker.link_command(build_data)
     if log_file != subprocess.DEVNULL:
-        log_file.write('{0}\n'.format(command))
-    return_code  = subprocess.call(
-                          command,
-                          shell= True,
-                          stdout= log_file,
-                          stderr= log_file)
-    if log_file != subprocess.DEVNULL:
-        log_file.write('\n')
+        log_file.write('{0}\n\n'.format(command))
+    try:
+        subprocess.check_output(shlex.split(command),
+                                stderr= subprocess.STDOUT)
+    except subprocess.CalledProcessError as error:
+        return_code = error.returncode
+        if log_file != subprocess.DEVNULL:
+            log_file.write('{0}\n\n'.format(error.output.decode('utf-8')))
+    else:
+        return_code = 0
     return return_code
 
 def make_build_test_data(object_list, build_data_list):
