@@ -152,7 +152,11 @@ class MakefileGenerator:
     def link_rule(self):
         """各プログラムのリンクのルールを生成"""
         code = []
-        for build_data in self.program_build_data_list():
+        # Program名でsortする
+        build_data_list = sorted(
+                    self.program_build_data_list(),
+                    key= lambda build_data: path_sort(build_data.program_path))
+        for build_data in build_data_list:
             code.extend(link_rule(build_data,
                                   self._build_comamnd_maker,
                                   self._dir_path))

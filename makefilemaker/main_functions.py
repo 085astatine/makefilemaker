@@ -39,7 +39,7 @@ def make_makefile_generator(self, build_data_list):
     if self._root_path in dir_list:
         sub_dir_list.remove(self._root_path)
     else:
-        dir_list.append(self._root_dir)
+        dir_list.append(self._root_path)
     # MakefileGeneratorを生成
     generator_list = []
     for dir in dir_list:
