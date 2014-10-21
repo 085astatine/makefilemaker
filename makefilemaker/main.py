@@ -9,15 +9,15 @@ from .build_command_maker import BuildCommandMaker
 from .object_path_maker \
 import same_source_name, same_source_dir, specific_directory
 from .link_object import LinkObject, LinkObjectMode
-from .command_line_option import option_parser, parse_option
+from .command_line_option import option_parser
 from .main_functions \
 import load_option, make_build_data_list, make_makefile_generator
 from .path_function import path_to_string, path_sort
 
 class MakefileMaker:
-    def __init__(self):
+    def __init__(self, argv= None):
         # オプション取得
-        self._option = parse_option(option_parser())
+        self._option = option_parser().parse_args(argv)
         if(self._option.verbose >= 1):
             print('option list:')
             print('  ', self._option)
@@ -114,22 +114,23 @@ class MakefileMaker:
         # 変更を反映
         self._build_command_maker.update_compiler(self._compiler_setting)
     
-    def include_path(self, target_lib, include_path):
+    def include_path(self, include_path, target_header= None):
         """include設定を読み込む
-        target_lib  : 対象となるライブラリ名
-                          シーケンス or str
-        include_path: includeされるpath
-                          str or pathlib.Path"""
-        self._build_command_maker.add_include_setting(target_lib, include_path)
+        include_path (pathlib.Path or str): includeに追加されるpath
+        target_header (sequence(str) or str or None)
+                    : 対象となるheader名
+                      None ならば全てに適用"""
+        self._build_command_maker.add_include_setting(
+                    include_path, formalize_target_header(target_header))
     
-    def library(self, library, target_lib):
+    def library(self, library, target_header= None):
         """library設定を読み込む
-        target_lib : 対象となるライブラリ名
-                        シーケンス or str or None
-                        None ならば全てに適用
-        library    : ライブラリ名
-                        シーケンス or str"""
-        self._build_command_maker.add_library_setting(library, target_lib)
+        library (sequence(str) or str) : リンクするライブラリ名
+        target_header (sequense(str)) or str or None)
+                    : 対象となるheader名
+                      None ならば全てに適用"""
+        self._build_command_maker.add_library_setting(
+                    library, formalize_target_header(target_header))
     
     def save_dependence_graph(self, filename):
         file_path = self._root_path.joinpath(filename)
@@ -151,3 +152,22 @@ class MakefileMaker:
         log_file: log file名 (str or pahlib.Path)"""
         log_path = pathlib.Path(log_file)
         self._link_object_log = log_path
+
+def formalize_target_header(target_header):
+    """入力された対象headerを整形して返す
+    target_header (sequense(str)) or str or None): 対象となるheader名
+    return sequence(str) or None"""
+    header_list = []
+    if target_header == None:
+        # None
+        header_list = None
+    elif isinstance(target_header, str):
+        # 文字列
+        header_list.append(target_header)
+    elif getattr(target_header, '__iter__', False):
+        # シーケンス
+        header_list.extend(target_header)
+    else:
+        # その他
+        header_list.append(target_header)
+    return header_list

@@ -34,45 +34,36 @@ class BuildCommandMaker:
         commpiler_setting: CommpilerSettting"""
         self._compiler_setting = compiler_setting
     
-    def add_include_setting(self, target_lib, include_path):
+    def add_include_setting(self, include_path, target_header):
         """include設定を読み込む
-        target_lib  : 対象となるライブラリ名
-                          シーケンス or str
-        include_path: includeされるpath
-                          str or pathlib.Path"""
+        include_path (pathlib.Path or str): includeに追加されるpath
+        target_header (sequence(str) or None)
+                    : 対象となるheader名
+                      None ならば全てに適用"""
         # path設定
         path = None
         if isinstance(include_path, str):# 文字列
             path = pathlib.Path(include_path)
         else:
             path = include_path
-        # lib設定
-        lib_list = []
-        if isinstance(target_lib, str):# 文字列
-            lib_list.append(target_lib)
-        elif getattr(target_lib, '__iter__', False):# シーケンス
-            lib_list.extend(target_lib)
-        else:
-            lib_list.append(target_lib)
         # 設定
-        for lib in lib_list:
-            self._include_setting[lib] = path
+        for target in target_header:
+            self._include_setting[target] = path
         # 表示
         if self._verbose:
             print('Update IncludeSetting')
-            for lib in lib_list:
-                print('  target      :{0}'.format(lib))
+            for target in target_header:
+                print('  target      :{0}'.format(target))
                 print('  include_path:{0}'.format(
-                            self._include_setting[lib].as_posix()))
+                            self._include_setting[target].as_posix()))
                 print()
     
-    def add_library_setting(self, target_lib, library):
+    def add_library_setting(self, library, target_header):
         """library設定を読み込む
-        target_lib : 対象となるライブラリ名
-                        シーケンス or str or None
-                        None ならば全てに適用
-        library    : ライブラリ名
-                        シーケンス or str"""
+        library (sequence(str) or str) : リンクするライブラリ名
+        target_header (sequense(str)) or None)
+                    : 対象となるheader名
+                      None ならば全てに適用"""
         # library名設定
         lib_list = []
         if (not isinstance(library, str)
@@ -80,27 +71,17 @@ class BuildCommandMaker:
             lib_list.extend(library)
         else:
             lib_list.append(library)
-        # terget設定
-        target_list = []
-        if target_lib == None:# None
-            target_list = None
-        elif isinstance(target_lib, str):# 文字列
-            target_list.append(target_lib)
-        elif getattr(target_lib, '__iter__', False):# シーケンス
-            target_list.extend(target_lib)
-        else:
-            target_list.append(target_lib)
         # 設定
-        if target_list == None:# Noneの場合
+        if target_header == None:# Noneの場合
             if not None in self._library_setting.keys():# 初期化
                 self._library_setting[None] = []
             self._library_setting[None].extend(lib_list)
-        for target in target_list:
+        for target in target_header:
             self._library_setting[target] = tuple(lib_list)
         # 表示
         if self._verbose:
             print('Update LibrarySetting')
-            for target in target_list:
+            for target in target_header:
                 print('  target :{0}'.format(target))
                 print('  library:{0}'.format(', '.join(
                             lib for lib in self._library_setting[target])))

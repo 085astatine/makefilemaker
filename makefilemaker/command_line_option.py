@@ -62,9 +62,3 @@ class LinkObjectModeSelect(argparse.Action):
         else:
             default_mode = LinkObjectMode.Search,
             setattr(namespace, self.dest, default_mode)
-
-def parse_option(option_parser, argv= None):
-    """オプションをparseする"""
-    if argv == None: argv = sys.argv[1:]
-    option = option_parser.parse_args(['--'].extend(argv))
-    return option
